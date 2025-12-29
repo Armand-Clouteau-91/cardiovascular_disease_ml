@@ -1,10 +1,11 @@
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.svm import SVC
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, train_test_split
 from sklearn.metrics import accuracy_score, classification_report
+from sklearn.ensemble import StackingClassifier
 
 
 def grid_search(model, param_grid, X_train, y_train, X_pred=None, y_pred=None):
@@ -19,13 +20,16 @@ def grid_search(model, param_grid, X_train, y_train, X_pred=None, y_pred=None):
     
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-    grid = GridSearchCV(
-        estimator= model(),
-        param_grid= param_grid,
+    grid = RandomizedSearchCV(
+        estimator= model,
+        param_distributions= param_grid,
+        n_iter=30,
         cv=cv,
         scoring='accuracy', 
         n_jobs=-1,          
-        verbose=1)
+        verbose=1,
+        random_state=42
+        )
 
     grid.fit(X_train, y_train)
     best_model = grid.best_estimator_
@@ -137,11 +141,76 @@ def run_models(grid,X_train, y_train, X_pred=None, y_pred=None):
         param_grid=config['params'],
         X_train=X_train,
         y_train=y_train,
-        X_test=X_pred,
-        y_test=y_pred
+        X_pred=X_pred,
+        y_pred=y_pred
+        )
+        results[model_name] = output
+    return results
+
+def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
+    """
+    Crée un modèle de Stacking qui utilise les prédictions des modèles de base
+    (LR, KNN, SVM) pour entraîner un Méta-Modèle (XGBoost/GradientBoosting).
+    """
+    print("\n" + "="*40)
+    print(" CONSTRUCTION DU STACKING MODEL")
+    print("="*40)
+
+    # 1. Récupération des 'best_model' depuis le dictionnaire de résultats
+    # On vérifie que les modèles existent bien dans 'results' avant de les ajouter
+    estimators = []
+    
+    if 'LogisticRegression' in results:
+        estimators.append(('lr', results['LogisticRegression']['best_model']))
+        
+    if 'KNeighbors' in results:
+        estimators.append(('knn', results['KNeighbors']['best_model']))
+        
+    # On gère le cas où le SVM s'appelle 'SVM' ou 'SVM_Stochastic'
+    if 'SVM_Stochastic' in results:
+        estimators.append(('svm', results['SVM_Stochastic']['best_model']))
+    elif 'SVM' in results:
+        estimators.append(('svm', results['SVM']['best_model']))
+
+    print(f"Modèles de base utilisés : {[name for name, _ in estimators]}")
+
+    # 2. Définition du Méta-Learner (Le Juge)
+    # On utilise GradientBoostingClassifier car c'est celui que vous avez importé
+    meta_learner = GradientBoostingClassifier(
+        n_estimators=100,
+        learning_rate=0.1,
+        max_depth=3,
+        random_state=42
     )
-    results[model_name] = output
-    return 
+
+    # 3. Création du StackingClassifier
+    # cv=5 est crucial ici : il permet d'entraîner le méta-modèle sans fuite de données (overfitting)
+    clf = StackingClassifier(
+        estimators=estimators, 
+        final_estimator=meta_learner,
+        cv=5,
+        n_jobs=-1
+    )
+
+    # 4. Entraînement
+    print("Entraînement du méta-modèle en cours...")
+    clf.fit(X_train, y_train)
+    
+    # 5. Évaluation
+    train_acc = clf.score(X_train, y_train)
+    print(f"Stacking Train Score: {train_acc:.4f}")
+
+    test_acc = None
+    if X_pred is not None and y_pred is not None:
+        test_preds = clf.predict(X_pred)
+        test_acc = accuracy_score(y_pred, test_preds)
+        print(f"Stacking Test Accuracy: {test_acc:.4f}")
+
+    return {
+        "model": clf,
+        "train_score": train_acc,
+        "test_score": test_acc
+    }
 
 if __name__ == "__main__":
     
@@ -160,11 +229,11 @@ if __name__ == "__main__":
                 'weights': ['uniform', 'distance']
             }
         },
-        'SVM': {
-            'model': SVC(),
+        'SVM_Stochastic': {
+            'model': SGDClassifier(loss='hinge', random_state=42, n_jobs=-1), # loss='hinge' = SVM linéaire
             'params': {
-                'C': [0.1, 1, 10],
-                'kernel': ['linear', 'rbf']
+                'alpha': [1e-4, 1e-3, 1e-2], # Remplace le paramètre 'C' (inversement proportionnel)
+                'penalty': ['l2', 'l1']
             }
         },
         'XGBoost': {
