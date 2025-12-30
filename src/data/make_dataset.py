@@ -32,9 +32,29 @@ def download_data():
         shutil.copy(path, target_dir)
         print(f"Copied {path} to {target_dir}")
 
-def data_cleaning(file_name):
-    csv_path = os.path.join("data","raw",f'{file_name}')
-    df = pd.read_csv(csv_path)
+def data_cleaning(file_name, sep=";"):
+    # Robust path handling: Try multiple common locations for data
+    possible_paths = [
+        os.path.join("data", "raw", f'{file_name}'),           # Run from root
+        os.path.join("..", "data", "raw", f'{file_name}'),     # Run from notebooks/ or src/
+        os.path.join("..", "..", "data", "raw", f'{file_name}'),# Run from nested folder
+        file_name                                               # Absolute path or in current dir
+    ]
+    
+    csv_path = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            csv_path = p
+            break
+            
+    if csv_path is None:
+         # Fallback for when called with full path
+        if os.path.exists(file_name):
+            csv_path = file_name
+        else:
+            raise FileNotFoundError(f"Could not find {file_name} in expected locations. Checked: {possible_paths}")
+
+    df = pd.read_csv(csv_path, sep=sep)
     df = df.set_index("id")
     df["age"] = df["age"] / 365
     df["age"] =df["age"].astype(int)
