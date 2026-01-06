@@ -1,6 +1,6 @@
 kagglehub
 pandas
-numpy
+numpy<2.4
 scikit-learn
 matplotlib
 seaborn
@@ -8,3 +8,4 @@ jupyter
 xgboost
 catboost
 lightgbm
+shap
