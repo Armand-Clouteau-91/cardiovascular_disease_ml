@@ -149,11 +149,11 @@ def run_models(grid,X_train, y_train, X_pred=None, y_pred=None):
 
 def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
     """
-    Crée un modèle de Stacking qui utilise les prédictions des modèles de base
-    (LR, KNN, SVM) pour entraîner un Méta-Modèle (XGBoost/GradientBoosting).
+    Creates a Stacking model that uses the predictions of the base models
+    (LR, KNN, SVM) to train a Meta-Model (XGBoost/GradientBoosting).
     """
     print("\n" + "="*40)
-    print(" CONSTRUCTION DU STACKING MODEL")
+    print(" STACKING MODEL CONSTRUCTION")
     print("="*40)
 
     # 1. Getting the best model from the dictionnary results
@@ -172,7 +172,7 @@ def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
     elif 'SVM' in results:
         estimators.append(('svm', results['SVM']['best_model']))
 
-    print(f"Modèles de base utilisés : {[name for name, _ in estimators]}")
+    print(f"Base models used: {[name for name, _ in estimators]}")
 
     # 2. Meta Learner 
     meta_learner = GradientBoostingClassifier(
@@ -191,7 +191,7 @@ def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
     )
 
     # 4. Training
-    print("Entraînement du méta-modèle en cours...")
+    print("Training meta-model...")
     clf.fit(X_train, y_train)
     
     # 5. Assessement
