@@ -1,6 +1,6 @@
 kagglehub
 pandas
-numpy<2.4
+numpy<2
 scikit-learn
 matplotlib
 seaborn
