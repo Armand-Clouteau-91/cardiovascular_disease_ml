@@ -156,8 +156,8 @@ def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
     print(" CONSTRUCTION DU STACKING MODEL")
     print("="*40)
 
-    # 1. Récupération des 'best_model' depuis le dictionnaire de résultats
-    # On vérifie que les modèles existent bien dans 'results' avant de les ajouter
+    # 1. Getting the best model from the dictionnary results
+    # check the model exist before adding it
     estimators = []
     
     if 'LogisticRegression' in results:
@@ -166,7 +166,7 @@ def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
     if 'KNeighbors' in results:
         estimators.append(('knn', results['KNeighbors']['best_model']))
         
-    # On gère le cas où le SVM s'appelle 'SVM' ou 'SVM_Stochastic'
+    # Check for the version of SVM  'SVM' or 'SVM_Stochastic'
     if 'SVM_Stochastic' in results:
         estimators.append(('svm', results['SVM_Stochastic']['best_model']))
     elif 'SVM' in results:
@@ -174,8 +174,7 @@ def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
 
     print(f"Modèles de base utilisés : {[name for name, _ in estimators]}")
 
-    # 2. Définition du Méta-Learner (Le Juge)
-    # On utilise GradientBoostingClassifier car c'est celui que vous avez importé
+    # 2. Meta Learner 
     meta_learner = GradientBoostingClassifier(
         n_estimators=100,
         learning_rate=0.1,
@@ -183,8 +182,7 @@ def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
         random_state=42
     )
 
-    # 3. Création du StackingClassifier
-    # cv=5 est crucial ici : il permet d'entraîner le méta-modèle sans fuite de données (overfitting)
+    # 3. Creation of StackingClassifier
     clf = StackingClassifier(
         estimators=estimators, 
         final_estimator=meta_learner,
@@ -192,11 +190,11 @@ def train_stacking_model(results, X_train, y_train, X_pred=None, y_pred=None):
         n_jobs=-1
     )
 
-    # 4. Entraînement
+    # 4. Training
     print("Entraînement du méta-modèle en cours...")
     clf.fit(X_train, y_train)
     
-    # 5. Évaluation
+    # 5. Assessement
     train_acc = clf.score(X_train, y_train)
     print(f"Stacking Train Score: {train_acc:.4f}")
 
@@ -230,9 +228,9 @@ if __name__ == "__main__":
             }
         },
         'SVM_Stochastic': {
-            'model': SGDClassifier(loss='hinge', random_state=42, n_jobs=-1), # loss='hinge' = SVM linéaire
+            'model': SGDClassifier(loss='hinge', random_state=42, n_jobs=-1), # loss='hinge' = SVM linéaire, SGD because otherwise too long to train
             'params': {
-                'alpha': [1e-4, 1e-3, 1e-2], # Remplace le paramètre 'C' (inversement proportionnel)
+                'alpha': [1e-4, 1e-3, 1e-2],
                 'penalty': ['l2', 'l1']
             }
         },
